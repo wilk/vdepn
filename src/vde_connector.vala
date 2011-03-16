@@ -206,6 +206,9 @@ namespace VDEPN.Manager {
 						throw new ConnectorError.CONNECTION_FAILED (check_host_stderr);
 					connector.connection_step (0.4, _("Host accepted us!"));
 				}
+				else {
+					throw new ConnectorError.CONNECTION_FAILED (_("No public key found!"));
+				}
 
 				connector.connection_step (0.5, _("Creating user script"));
 

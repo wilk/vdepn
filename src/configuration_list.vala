@@ -197,23 +197,26 @@ namespace VDEPN {
 			p.connection_failed.connect ((widget, conn_name, err) => {
 					statusbar.push (0, _("Error while connecting to ") + conn_name);
 
-					/* Show a nice error dialog if something went wrong */
-					Dialog error_dialog = new Dialog.with_buttons ("Error", this, DialogFlags.MODAL);
-					Label err_label = new Label ("<b>" + err + "</b>");
-					err_label.use_markup = true;
-					error_dialog.vbox.add (new Label (_("Error while activating connection")));
-					error_dialog.vbox.add (err_label);
-					error_dialog.add_button (_("Close"), 0);
-					error_dialog.vbox.show_all ();
-					error_dialog.close.connect ((ev) => {
-							error_dialog.destroy ();
-						});
-
-					error_dialog.response.connect ((ev, resp) => {
-							error_dialog.destroy ();
-						});
-
-					error_dialog.run ();
+					/* Answering ssh password to generating keys */					
+					Dialog ssh_dialog = new Dialog.with_buttons (_("Error"), this, DialogFlags.MODAL);
+					Entry ssh_pass_entry = new Entry ();
+					
+					ssh_pass_entry.set_visibility (false);
+					ssh_dialog.vbox.add (new Label (_("Connection failed.\nInsert your ssh password:")));
+					ssh_dialog.vbox.add (ssh_pass_entry);
+					ssh_dialog.add_button (_("Ok"), 0);
+					ssh_dialog.add_button (_("Cancel"), 1);
+					ssh_dialog.vbox.show_all ();
+					ssh_dialog.close.connect ((ev) => { ssh_dialog.destroy (); });
+					ssh_dialog.response.connect ((ev, resp) => {
+							if (resp == 0) {
+								/* TODO: Calling SSHLIB Module to copying vdepn-key.pub in ~/.ssh/authorized_keys */
+							}
+					});
+					
+					ssh_dialog.run ();
+					
+					ssh_dialog.destroy ();
 
 					/* Remove the last two messages from statusbar (Trying to connect and Connection failed) */
 					statusbar.pop (0);
