@@ -64,6 +64,7 @@ namespace VDEPN {
 		private AccelGroup accel_group;
 		private VNotification notificator;
 		private Statusbar statusbar;
+		private VDETrayIcon tray;
 
 		public Manager.VDEConnector connections_manager { get; private set; }
 		public VDEParser conf_holder					{ get; private set; }
@@ -123,12 +124,62 @@ namespace VDEPN {
 			add (main_vbox);
 
 			statusbar.push (0, "VDEPN Does Extend Private Networking. " + _("Welcome, mate!"));
+
 			show_all ();
 		}
 
+		/* Shows the Icon in the tray */
+		public void attach_tray_icon () {
+			tray = new VDETrayIcon ();
+			tray.show ();
+
+			tray.activate.connect (() => visible = !visible);
+
+			tray.quit_application.connect (() => quit_application ());
+
+			tray.manage_connection.connect ((self, conn_id) => {
+					foreach (ConfigurationPage v in pages_list) {
+						if (v.config.connection_name == conn_id) {
+							v.manage_connection ();
+							break;
+						}
+					}
+				});
+
+			tray.disconnect_connection.connect ((self, conn_id) => {
+					foreach (ConfigurationPage v in pages_list) {
+						if (v.config.connection_name == conn_id) {
+							v.close_connection ();
+							break;
+						}
+					}
+
+				});
+
+			tray.show_connection_page.connect ((self, conn_id) => {
+					foreach (VDEConfiguration v in conf_list) {
+						if (v.connection_name == conn_id) {
+							int index = conf_list.index (v);
+							conf_pages.set_current_page (index);
+							visible = true;
+							present ();
+							break;
+						}
+					}
+				});
+		}
 
 		/* Attach signals */
 		private void attach_signals (ConfigurationPage p) {
+			/* Check if the Connection is already alive */
+			if (p.check_if_alive ()) {
+				/* Workaround for a bug in Vala's lambda methods */
+				ConfigurationPage check = p;
+				Timeout.add (Helper.TIMEOUT, () => {
+						return (check.check_if_alive ());
+					});
+			}
+
 			p.connection_start.connect ((widget, conn_name) => {
 					widget.sensitive = false;
 					statusbar.push (0, _("Changing status of connection ") + conn_name);

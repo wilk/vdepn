@@ -33,6 +33,7 @@ namespace VDEPN {
 		private VBox right_pane;
 		private Button manage_button;
 		private Button activate_button;
+		private ProgressBar progress_bar;
 
 		/* read-only properties (left part of the pane) */
 		public ConfigurationProperty conn_name_property		{ get; private set; }
@@ -67,6 +68,9 @@ namespace VDEPN {
 
 			left_pane = new VBox (false, 5);
 			right_pane = new VBox (false, 30);
+			progress_bar = new ProgressBar ();
+			progress_bar.bar_style = Gtk.ProgressBarStyle.CONTINUOUS;
+			progress_bar.ellipsize = Pango.EllipsizeMode.MIDDLE;
 
 			this.config = v;
 			this.connector = Manager.VDEConnector.get_instance ();
@@ -119,6 +123,7 @@ namespace VDEPN {
 			left_pane.pack_start (checkbuttons_box, false, false, 0);
 			/* This is used as an invisble widget to fill the empty space between the labels and the buttons */
 			left_pane.pack_start (new Alignment (0, 0, 0, 0), true, false, 0);
+			left_pane.pack_start (progress_bar, false, false, 0);
 			left_pane.pack_start (inner_buttons_box, false, false, 0);
 
 			pack_start (left_pane, false, false, 0);
@@ -134,6 +139,10 @@ namespace VDEPN {
 			activate_button.clicked.connect ((ev) => {
 					/* Emit the first signal */
 					this.connection_start (this, config.connection_name);
+
+					/* Attach connector events to spin the progress_bar */
+					connector.connection_step.connect (progress_bar_event_handler);
+
 
 					/* Start the Connector instance in background */
 					Thread.create<void*> (() => {
@@ -154,6 +163,7 @@ namespace VDEPN {
 									Gdk.threads_enter ();
 									this.connection_successful (this, config.connection_name);
 									manage_button.sensitive = Preferences.CustomPreferences.get_instance ().management_mode;
+									connector.connection_step.disconnect (progress_bar_event_handler);
 									Gdk.threads_leave ();
 								}
 
@@ -172,6 +182,7 @@ namespace VDEPN {
 								connector.rm_connection (config.connection_name);
 								Gdk.threads_enter ();
 								this.connection_deactivated (this, config.connection_name);
+								connector.connection_step.disconnect (progress_bar_event_handler);
 								manage_button.sensitive = false;
 								Gdk.threads_leave ();
 							}
@@ -181,13 +192,34 @@ namespace VDEPN {
 				});
 
 			/* Open up a terminal showing the unixterm for the switch */
-			manage_button.clicked.connect (() => {
-					string terminal = Preferences.CustomPreferences.get_instance ().terminal;
-					Process.spawn_command_line_async (terminal + " -e 'unixterm " + socket_property.get_value () + ".mgmt'");
-				});
+			manage_button.clicked.connect (() => manage_connection ());
 
 			show_all ();
 		}
+
+		/* Close the connection in a clean way */
+		public void close_connection () {
+			button_status = false;
+			activate_button.label = _("Activate");
+			connector.rm_connection (config.connection_name);
+			this.connection_deactivated (this, config.connection_name);
+			progress_bar_event_handler (null, 0, null);
+			connector.connection_step.disconnect (progress_bar_event_handler);
+			manage_button.sensitive = false;
+		}
+
+		/* Open up a terminal showing the unixterm for that switch */
+		public void manage_connection () {
+			string terminal = Preferences.CustomPreferences.get_instance ().terminal;
+			Process.spawn_command_line_async (terminal + " -e 'unixterm " + socket_property.get_value () + ".mgmt'");
+		}
+
+		/* This is necessary to attach and detach connector signals */
+		private void progress_bar_event_handler (Manager.VDEConnector sender, double step, string caption) {
+			progress_bar.set_fraction (step);
+			progress_bar.text = caption;
+		}
+
 
 		/* get the activate/deactivate button checking if the current
 		 * connection is already active */
@@ -197,6 +229,8 @@ namespace VDEPN {
 				connector.new_connection_from_pid (config);
 				button_status = true;
 				this.connection_successful (this, config.connection_name);
+				progress_bar_event_handler (null, 1, _("Done!"));
+				manage_button.sensitive = Preferences.CustomPreferences.get_instance ().management_mode;
 				return new Button.with_label (_("Deactivate"));
 			}
 			else {
@@ -209,8 +243,8 @@ namespace VDEPN {
 		 * alive and, if the connection is no longer alive, it
 		 * deactivates it */
 		public bool check_if_alive () {
-			Manager.VDEConnection to_be_checked = connector.get_connection_from_name (config.connection_name);
 			try {
+				Manager.VDEConnection to_be_checked = connector.get_connection_from_name (config.connection_name);
 				if (to_be_checked.is_alive () && button_status)
 					return true;
 
@@ -219,6 +253,8 @@ namespace VDEPN {
 					activate_button.label = _("Activate");
 					connector.rm_connection (config.connection_name);
 					this.connection_deactivated (this, config.connection_name);
+					this.manage_button.sensitive = false;
+					progress_bar_event_handler (null, 0, null);
 					return false;
 				}
 			}
@@ -226,7 +262,7 @@ namespace VDEPN {
 			/* The only exception  which may be thrown is  the one that tells us
 			 * that the connection isn't found in the active connections pool,
 			 * which means that the user has manually deactivated it */
-			catch (Error e) {
+			catch (Manager.ConnectorError e) {
 				return false;
 			}
 
