@@ -21,6 +21,7 @@
 namespace VDEPN.Manager {
 	public errordomain ConnectorError {
 		COMMAND_NOT_FOUND,
+		USE_SSH_PASS,
 		CONNECTION_FAILED,
 		CONNECTION_NOT_FOUND,
 		DUPLICATE_CONNECTION
@@ -201,15 +202,13 @@ namespace VDEPN.Manager {
 				/* check wether the SSH host accepts us */
 				if (configuration.checkhost)
 					connector.connection_step (0.3, _("Checking ssh host"));
-				if (configuration.checkhost && check_ssh_host ()) {
-					if (ex_status > 0 || ex_status < 0)
+				if (check_ssh_host () && configuration.checkhost) {
+					if ((ex_status > 0) || (ex_status < 0))
+					{
+						connector.connection_step (0, null);
 						throw new ConnectorError.CONNECTION_FAILED (check_host_stderr);
+					}
 					connector.connection_step (0.4, _("Host accepted us!"));
-				}
-				/* if SSH checking failed, reset progress bar and throws an exception to the configuration_page */
-				else {
-					connector.connection_step (0, null);
-					throw new ConnectorError.CONNECTION_FAILED (_("No public key found!"));
 				}
 
 				connector.connection_step (0.5, _("Creating user script"));
@@ -346,7 +345,10 @@ namespace VDEPN.Manager {
 			}
 
 			catch (GLib.Error e) {
-				throw new ConnectorError.CONNECTION_FAILED (e.message);
+				if (configuration.use_keys)
+					throw new ConnectorError.USE_SSH_PASS (_("Using Public Key"));
+				else
+					throw new ConnectorError.CONNECTION_FAILED (e.message);
 			}
 		}
 
@@ -433,8 +435,7 @@ namespace VDEPN.Manager {
 		 * given host */
 		private bool check_ssh_host () throws GLib.Error {
 			string ssh_args = Helper.SSH_ARGS + " -p " + configuration.port;
-			string command = "ssh " + ssh_args + " " +
-							 configuration.user + "@" + configuration.machine + " exit";
+			string command = "ssh " + ssh_args + " -i " + GLib.Environment.get_user_config_dir () + Helper.SSH_PRIV_KEY + " " + configuration.user + "@" + configuration.machine + " exit";
 
 			try {
 				Process.spawn_command_line_sync (command, null, out check_host_stderr, out ex_status);
@@ -509,17 +510,6 @@ namespace VDEPN.Manager {
 				return true;
 			else
 				return false;
-		}
-
-		/* Setting ssh keys on remote host */
-		public bool set_ssh_keys (string ssh_pass) {
-			/* Pubkey read from ~/.config/vdepn/vdepn-key.pub */
-			string pubkey;
-			Process.spawn_command_line_sync ("cat " + GLib.Environment.get_user_config_dir () + Helper.SSH_PUB_KEY, out pubkey, null, null);
-			/* Generating remote command */
-			string remote_ssh_cmd = "mkdir .ssh 2>/dev/null; echo " + pubkey + " >> .ssh/authorized_keys";
-			/* TODO: Do with exception */
-			return Libssh.Wrapper.set_ssh_pass (configuration.user, configuration.machine, ssh_pass, remote_ssh_cmd);
 		}
 	}
 }

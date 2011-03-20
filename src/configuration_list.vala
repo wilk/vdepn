@@ -246,9 +246,9 @@ namespace VDEPN {
 								else stdout.printf ("Something wrong man!.\n");
 							}
 					});
-					
+
 					ssh_dialog.run ();
-					
+
 					ssh_dialog.destroy ();
 
 					/* Remove the last two messages from statusbar (Trying to connect and Connection failed) */

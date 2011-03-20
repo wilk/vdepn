@@ -38,7 +38,7 @@ namespace VDEPN {
 		public const string LOGO_PATH = Config.PKGDATADIR + "/share/icons/hicolor/scalable/apps/vdepn_big.svg";
 		public const string XML_FILE = PROG_DATA_DIR + "/connections.xml";
 		public const string XML_PREF_FILE = PROG_DATA_DIR + "/preferences.xml";
-		public const string SSH_ARGS = "-o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30";
+		public const string SSH_ARGS = "-o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o PreferredAuthentications=publickey";
 		public const string SSH_KEYGEN_ARGS = "-b 2048 -N '' -q -f";
 		public const string SSH_PRIV_KEY = PROG_DATA_DIR + "/vdepn-key";
 		public const string SSH_PUB_KEY = PROG_DATA_DIR + "/vdepn-key.pub";
