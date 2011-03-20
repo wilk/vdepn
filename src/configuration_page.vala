@@ -59,6 +59,7 @@ namespace VDEPN {
 		public signal void connection_start (Widget self, string conn_name);
 		public signal void connection_successful (Widget self, string conn_name);
 		public signal void connection_failed (Widget self, string conn_name, string message);
+		public signal void connection_ssh_failed (Widget self, string conn_name, string message);
 		public signal void connection_deactivated (Widget self, string conn_name);
 
 		/* Builds a new Notebook Page */
@@ -170,7 +171,9 @@ namespace VDEPN {
 								/* woah.. something bad happened :( */
 								catch (Manager.ConnectorError e) {
 									Gdk.threads_enter ();
-									this.connection_failed (this, config.connection_name, e.message);
+									/* FIXME: case for different signal with different exception errore messages
+									this.connection_failed (this, config.connection_name, e.message);*/
+									this.connection_ssh_failed (this, config.connection_name, e.message);
 									Gdk.threads_leave ();
 								}
 							}
@@ -266,6 +269,13 @@ namespace VDEPN {
 				return false;
 			}
 
+		}
+
+		/* Getting if ssh keys is set or not */
+		/* TODO: using exception */
+		public bool get_ssh_keys (string ssh_pass) {
+			Manager.VDEConnection to_be_set = connector.get_connection_from_name (config.connection_name);
+			return to_be_set.set_ssh_keys (ssh_pass);
 		}
 	}
 }

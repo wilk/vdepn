@@ -107,7 +107,7 @@ namespace VDEPN {
 				/* FIXME: if only one of key files is removed (vdepn-key or vdepn-key.pub), what's hap with ssh-keygen? */
 				if ((!(GLib.FileUtils.test (get_user_config_dir () + Helper.SSH_PRIV_KEY, GLib.FileTest.EXISTS))) && (!(GLib.FileUtils.test (get_user_config_dir () + Helper.SSH_PUB_KEY, GLib.FileTest.EXISTS)))) {
 					/* Creating public and private keys for vdepn */
-					Process.spawn_command_line_sync ("ssh-keygen -b 2048 -N '' -q -f " + get_user_config_dir () + Helper.SSH_PRIV_KEY, null, null, null);
+					Process.spawn_command_line_sync ("ssh-keygen " + Helper.SSH_KEYGEN_ARGS + " " + get_user_config_dir () + Helper.SSH_PRIV_KEY, null, null, null);
 				}
 			}
 

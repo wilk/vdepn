@@ -9,7 +9,8 @@ AM_CPPFLAGS = \
 			$(GLIB_CFLAGS) \
 			$(GTK_CFLAGS) \
 			$(LIBNOTIFY_CFLAGS) \
-			$(LIBXML_CFLAGS)
+			$(LIBXML_CFLAGS) \
+			$(LIBSSH2_CFLAGS)
 
 AM_VALAFLAGS = \
 			--disable-assert \
@@ -18,6 +19,7 @@ AM_VALAFLAGS = \
 			--pkg gtk+-2.0 \
 			--pkg config \
 			--pkg libnotify \
+			--pkg libssh2 \
 			--vapidir "$(abs_top_srcdir)/vapi"
 
 bin_PROGRAMS = vde_manager
@@ -31,10 +33,13 @@ vde_manager_SOURCES = \
 			configuration_page.vala \
 			tray_icon.vala \
 			vde_connector.vala \
-			preferences.vala
+			preferences.vala \
+			libssh2_wrapper.vala \
+			libssh2_module.c
 
 vde_manager_LDFLAGS = \
 			$(GLIB_LIBS) \
 			$(GTK_LIBS) \
 			$(LIBNOTIFY_LIBS) \
-			$(LIBXML_LIBS)
+			$(LIBXML_LIBS) \
+			$(LIBSSH2_LIBS)

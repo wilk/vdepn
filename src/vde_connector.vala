@@ -206,7 +206,9 @@ namespace VDEPN.Manager {
 						throw new ConnectorError.CONNECTION_FAILED (check_host_stderr);
 					connector.connection_step (0.4, _("Host accepted us!"));
 				}
+				/* if SSH checking failed, reset progress bar and throws an exception to the configuration_page */
 				else {
+					connector.connection_step (0, null);
 					throw new ConnectorError.CONNECTION_FAILED (_("No public key found!"));
 				}
 
@@ -237,7 +239,8 @@ namespace VDEPN.Manager {
 
 				/* dpipe ssh connection (ssh args user@machine "vde_plug remote_sock_path" = vde_plug local_sock_path */
 				string ssh_args = Helper.SSH_ARGS + " -p " + configuration.port;
-				user_script += dpipe_cmd + " ssh " + ssh_args + " " + configuration.user + "@" + configuration.machine + " ";
+				/* using '-i' arg to using vdepn-key */
+				user_script += dpipe_cmd + " ssh " + ssh_args + " -i " + GLib.Environment.get_user_config_dir () + Helper.SSH_PRIV_KEY + " " + configuration.user + "@" + configuration.machine + " ";
 				user_script += "\"" + remote_vde_plug_cmd + "\" ";
 				user_script += "= " + local_vde_plug_cmd + " &\n";
 
@@ -245,7 +248,7 @@ namespace VDEPN.Manager {
 				user_script += "sleep 5\n\n";
 
 				/* ssh connection pid acquiring */
-				user_script += pgrep_cmd + " -fn \"ssh " + ssh_args + " " + configuration.user +
+				user_script += pgrep_cmd + " -fn \"ssh " + ssh_args + " -i " + GLib.Environment.get_user_config_dir () + Helper.SSH_PRIV_KEY + " " + configuration.user +
 					"@" + configuration.machine + "\" > /tmp/vdepn-" + configuration.connection_name + "-ssh.pid\n\n";
 
 				/* vde_plug pid acquiring (or script failure) */
@@ -506,6 +509,17 @@ namespace VDEPN.Manager {
 				return true;
 			else
 				return false;
+		}
+
+		/* Setting ssh keys on remote host */
+		public bool set_ssh_keys (string ssh_pass) {
+			/* Pubkey read from ~/.config/vdepn/vdepn-key.pub */
+			string pubkey;
+			Process.spawn_command_line_sync ("cat " + GLib.Environment.get_user_config_dir () + Helper.SSH_PUB_KEY, out pubkey, null, null);
+			/* Generating remote command */
+			string remote_ssh_cmd = "mkdir .ssh 2>/dev/null; echo " + pubkey + " >> .ssh/authorized_keys";
+			/* TODO: Do with exception */
+			return Libssh.Wrapper.set_ssh_pass (configuration.user, configuration.machine, ssh_pass, remote_ssh_cmd);
 		}
 	}
 }
