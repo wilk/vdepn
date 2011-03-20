@@ -19,7 +19,6 @@ AM_VALAFLAGS = \
 			--pkg gtk+-2.0 \
 			--pkg config \
 			--pkg libnotify \
-			--pkg libssh2 \
 			--vapidir "$(abs_top_srcdir)/vapi"
 
 bin_PROGRAMS = vde_manager
