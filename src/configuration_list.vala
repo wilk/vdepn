@@ -224,12 +224,15 @@ namespace VDEPN {
 
 			/* Handle SSH connection failed signal */
 			p.connection_ssh_failed.connect ((widget, conn_name, err) => {
+					bool ris_ssh = false;
+					bool use_ssh = false;
+
 					statusbar.push (0, _("Error while connecting to ") + conn_name);
 
 					/* Answering ssh password to generating keys */					
-					Dialog ssh_dialog = new Dialog.with_buttons (_("Error"), this, DialogFlags.MODAL);
+					Dialog ssh_dialog = new Dialog.with_buttons ("Error", this, DialogFlags.MODAL);
 					Entry ssh_pass_entry = new Entry ();
-					
+
 					ssh_pass_entry.set_visibility (false);
 					ssh_dialog.vbox.add (new Label (_("Connection failed.\nInsert your ssh password:")));
 					ssh_dialog.vbox.add (ssh_pass_entry);
@@ -239,17 +242,39 @@ namespace VDEPN {
 					ssh_dialog.close.connect ((ev) => { ssh_dialog.destroy (); });
 					ssh_dialog.response.connect ((ev, resp) => {
 							if (resp == 0) {
-								/* TODO: using exception */
+								/* TODO: using new dialog box to report the answer */
 								/* Calling libssh2_module.c passing SSH password just read */
-								if (((ConfigurationPage) widget).get_ssh_keys (ssh_pass_entry.text)) 
-									stdout.printf ("Ok! get_ssh_keys ()\n");
-								else stdout.printf ("Something wrong man!.\n");
+								use_ssh = true;
+								ris_ssh = ((ConfigurationPage) widget).get_ssh_keys (ssh_pass_entry.text);
 							}
 					});
 
 					ssh_dialog.run ();
-
 					ssh_dialog.destroy ();
+
+					/* If resp == 0 (button "ok" pushed) */
+					if (use_ssh) {
+
+						Dialog ris_dialog = new Dialog.with_buttons ("Response", this, DialogFlags.MODAL);
+
+						/* If all went well, show a nice dialog */
+						if (ris_ssh) {
+							ris_dialog.vbox.add (new Label (_("Successful! Public key registered on the remote server.\nConnect again.")));
+							ris_dialog.add_button (_("Ok"), 0);
+						}
+						else {
+							ris_dialog.vbox.add (new Label (_("Error! Can't r Public key registered on the remote server.")));
+							ris_dialog.add_button (_("Ok"), 0);
+						}
+
+						ris_dialog.vbox.show_all ();
+						ris_dialog.close.connect ((ev) => { ris_dialog.destroy (); });
+						ris_dialog.response.connect ((ev, resp) => { ris_dialog.destroy (); });
+
+						ris_dialog.run ();
+						ris_dialog.destroy ();
+
+					}
 
 					/* Remove the last two messages from statusbar (Trying to connect and Connection failed) */
 					statusbar.pop (0);

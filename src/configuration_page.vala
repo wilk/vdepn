@@ -168,10 +168,10 @@ namespace VDEPN {
 									Gdk.threads_leave ();
 								}
 
-								/* Request SSH Pass */
+								/* Exception to useing SSH password */
 								catch (Manager.ConnectorError.USE_SSH_PASS e) {
 									Gdk.threads_enter ();
-										this.connection_ssh_failed (this, config.connection_name, e.message);
+									this.connection_ssh_failed (this, config.connection_name, e.message);
 									Gdk.threads_leave ();
 								}
 
@@ -277,21 +277,18 @@ namespace VDEPN {
 		}
 
 		/* Getting if ssh keys is set or not */
-		/* TODO: using exception */
 		public bool get_ssh_keys (string ssh_pass) {
 			try {
-				/*Manager.VDEConnection to_be_set = connector.get_connection_from_name (config.connection_name);*/
 				/* Pubkey read from ~/.config/vdepn/vdepn-key.pub */
 				string pubkey;
-				Process.spawn_command_line_sync ("cat " + GLib.Environment.get_user_config_dir () + Helper.SSH_PUB_KEY, out pubkey, null, null);
+				FileUtils.get_contents(GLib.Environment.get_user_config_dir () + Helper.SSH_PUB_KEY, out pubkey);
+
 				/* Generating remote command */
 				string remote_ssh_cmd = "mkdir .ssh 2>/dev/null; echo -n '" + pubkey + "' >> .ssh/authorized_keys";
-				/* TODO: Do with exception */
 				return Libssh.Wrapper.set_ssh_pass (config.user, config.machine, ssh_pass, remote_ssh_cmd);
 			}
-			
+
 			catch (Manager.ConnectorError e) {
-				/*stdout.printf ("%s\n", e.message);*/
 				return false;
 			}
 		}

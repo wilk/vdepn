@@ -1,3 +1,23 @@
+/* VDE PN Manager -- VDE Private Network Manager
+ * Copyright (C) 2011 - Massimo Gengarelli <gengarel@cs.unibo.it>
+ *                    - Vincenzo Ferrari   <ferrari@cs.unibo.it>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ */
+
 #include <stdio.h>
 
 #include <sys/types.h>
@@ -10,7 +30,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
-/* cmd_pubkey = mkdir .ssh; echo 'pubkey' >> .ssh/authorized_keys */
+/* Using a SSH connection to registering vdepn public key on remote host */
 gboolean vdepn_libssh_wrapper_set_ssh_pass (const gchar *user, const gchar *host, const gchar *pass, const gchar *cmd_pubkey) {
   struct addrinfo hints;
   struct addrinfo *result;
@@ -19,9 +39,13 @@ gboolean vdepn_libssh_wrapper_set_ssh_pass (const gchar *user, const gchar *host
   char buffer[400];
   LIBSSH2_SESSION *session;
   LIBSSH2_CHANNEL *channel;
+  char *userauthlist;
 
   /* Initialize libssh2 functions */
-  libssh2_init (0);
+  if ((libssh2_init (0)) < 0) {
+  	fprintf (stderr, "Error! Could not initialize libssh2\n");
+  	return -1;
+  }
 
   /* Needed to get host by name */
   hints.ai_family = AF_INET;
@@ -32,90 +56,73 @@ gboolean vdepn_libssh_wrapper_set_ssh_pass (const gchar *user, const gchar *host
   hints.ai_canonname = NULL;
   hints.ai_addr = NULL;
   hints.ai_flags = AI_NUMERICSERV;
-  
-  printf ("Username : %s\n", user);
-  printf ("Host : %s\n", host);
-  printf ("Password : %s\n", pass);
-  printf ("Pubkey : %s\n", cmd_pubkey);
 
   /* This is the new replacement for gethostby* */
-  /* argv[2] : host, 22 it's a service (ssh) */
-  res = getaddrinfo (host, "22", &hints, &result);
-
-  if (res > 0) {
-	fprintf (stderr, "%s\n", gai_strerror (res));
+  if ((getaddrinfo (host, "22", &hints, &result)) > 0) {
+  	fprintf (stderr, "%s\n", gai_strerror (res));
 	return -1;
   }
 
   /* Communication descriptor */
-  connecting_socket = socket (hints.ai_family, hints.ai_socktype, 0);
-  /* Connection */
-  res = connect (connecting_socket, result->ai_addr, result->ai_addrlen);
+  if ((connecting_socket = socket (hints.ai_family, hints.ai_socktype, 0)) == -1) {
+  	perror ("socket()");
+  	return -1;
+  }
 
-  if (res != 0) {
-	perror ("connect()");
+  /* Connection */
+  if ((connect (connecting_socket, result->ai_addr, result->ai_addrlen)) == -1) {
+  	perror ("connect()");
 	return -1;
   }
 
   /* Init libssh2 session */
-  session = libssh2_session_init ();
+  if ((session = libssh2_session_init ()) == NULL) {
+  	fprintf (stderr, "Error! Could not initialize SSH session\n");
+  	return -1;
+  }
 
   /* Init transport layer (ssh session) */
-  if (libssh2_session_startup (session, connecting_socket)) {
-	fprintf (stderr, "Could not initialize SSH session\n");
+  if ((libssh2_session_startup (session, connecting_socket)) < 0) {
+	fprintf (stderr, "Error! Could not start SSH session\n");
 	return -1;
   }
 
   /* List of authentication methods supported by server */
-  char *userauthlist = libssh2_userauth_list (session, user, strlen(user));
+  if ((userauthlist = libssh2_userauth_list (session, user, strlen(user))) == NULL) {
+  	fprintf (stderr, "Error! Could not list the authentication methods supported by server\n");
+  	return -1;
+  }
 
   /* Finding the authentication password method */
-  if (strstr (userauthlist, "password") != NULL)
-	printf ("Ok, found password authentication method on %s\n", host);
+  if ((strstr (userauthlist, "password")) == NULL) {
+	fprintf (stderr, "Error! Could not found a password authentication method on %s\n", host);
+	return -1;
+  }
 
   /* Authenticate via password */
   /* session : ssh session */
-  /* argv[1] : username */
-  /* argv[3] : password */
-  if (libssh2_userauth_password (session, user, pass)) {
-	fprintf (stderr, "Password authentication failed\n");
-	fprintf (stderr, "Maybe wrong user or password.\n");
+  if ((libssh2_userauth_password (session, user, pass)) < 0) {
+	fprintf (stderr, "Error! Could not authenticate via password\n");
 	return -1;
   }
-  else
-	printf ("Password authentication succeeded\n");
 
   /* Checking authentication status */
-  if (libssh2_userauth_authenticated(session))
-  	printf ("Hell yeah! Authenticated successful!\n");
-  else {
-  	fprintf (stderr, "Not authenticated yet\n");
+  if ((libssh2_userauth_authenticated(session)) == 0) {
+  	fprintf (stderr, "Error! Could not authenticate\n");
   	return -1;
   }
 
   /* Get a new session channel */
-  if (!(channel = libssh2_channel_open_session (session))) {
-  	fprintf (stderr, "Session not received\n");
+  if ((channel = libssh2_channel_open_session (session)) == NULL) {
+  	fprintf (stderr, "Error! Could not receive session\n");
   	return -1;
   }
-  else
-	printf ("Session received\n");
   
-  /*printf ("Vai col comando in remoto!");*/
-  /* argv[4] = "mkdir .ssh 2>/dev/null; echo 'pubkey' >> .ssh/authorized_keys" */
+  /* Exec cmd_pubkey into the remote host */
   if ((libssh2_channel_exec (channel, cmd_pubkey)) < 0) {
-  	fprintf (stderr, "An error occured with libssh2_channel_exec ()");
+  	fprintf (stderr, "Error! Could not copy the pubkey into the remote host\n");
   	return -1;
   }
-  
-  
-  /* send command (argv[4]) */
-  /*libssh2_channel_exec (channel, argv[4]);*/
-
-  /* read result */
-/*  libssh2_channel_read (channel, buffer, sizeof (buffer));
-
-  printf("read: %s\n", buffer);*/
 
   libssh2_exit ();
   
